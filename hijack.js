@@ -1,91 +1,72 @@
-// hijack.js V7 – prototype scan & early stopPlay
-const pass = () => {};
-
+// hijack.js V8 – cached stopPlay + microtask resume
 (() => {
-    const AD_HOST = 'global-cdn.me'; // 广告流域名
+    const AD_HOST = 'global-cdn.me';
     const MAIN_VIDEO_SEL = 'video#video_player';
 
-    /* -------- 1. 深度扫描组件树，连同 prototype -------- */
-    function findStopPlayInstance() {
-        const roots = document.querySelectorAll('aa-videoplayer');
-        for (const el of roots) {
-            const ctxKey = Object.keys(el).find((k) =>
+    let stopPlayFn = null;
+
+    /* -------- one-time deep search -------- */
+    const locateStopPlay = () => {
+        if (stopPlayFn) return;
+        const players = document.querySelectorAll('aa-videoplayer');
+        for (const el of players) {
+            const key = Object.keys(el).find((k) =>
                 k.startsWith('__ngContext__')
             );
-            if (!ctxKey) continue;
+            if (!key) continue;
 
-            const ctx = el[ctxKey];
-            const stack = Array.isArray(ctx) ? [...ctx] : [ctx];
-
+            const stack = [...el[key]];
             const visited = new Set();
+
             while (stack.length) {
                 const obj = stack.pop();
                 if (!obj || typeof obj !== 'object' || visited.has(obj))
                     continue;
                 visited.add(obj);
 
-                /* —— 检查实例本身 —— */
-                if (typeof obj.stopPlay === 'function') return obj;
+                if (typeof obj.stopPlay === 'function') {
+                    stopPlayFn = obj.stopPlay.bind(obj);
+                    return;
+                }
 
-                /* —— 检查原型链 —— */
                 let p = Object.getPrototypeOf(obj);
                 while (p && p !== Object.prototype) {
-                    if (typeof p.stopPlay === 'function') return obj;
+                    if (typeof p.stopPlay === 'function') {
+                        stopPlayFn = p.stopPlay.bind(obj);
+                        return;
+                    }
                     p = Object.getPrototypeOf(p);
                 }
 
-                /* —— 继续深搜所有字段 —— */
                 for (const k in obj) {
-                    try {
-                        const v = obj[k];
-                        if (typeof v === 'object' && v) stack.push(v);
-                    } catch {
-                        pass();
-                    }
+                    const v = obj[k];
+                    if (typeof v === 'object' && v) stack.push(v);
                 }
             }
         }
-        return null;
-    }
+    };
 
-    /* -------- 2. 注入拦截逻辑 -------- */
+    /* try a few times quickly after load */
+    [0, 100, 300, 600, 1200, 2500, 4000].forEach((t) =>
+        setTimeout(locateStopPlay, t)
+    );
+
+    /* -------- intercept play -------- */
     const nativePlay = HTMLVideoElement.prototype.play;
 
     HTMLVideoElement.prototype.play = function (...args) {
-        /* —— 发现广告流 —— */
-        if (this.src && this.src.includes(AD_HOST)) {
-            console.debug('[purifier] ad play detected, trying stopPlay');
-
-            const playerInst = findStopPlayInstance();
-            if (playerInst) {
-                try {
-                    playerInst.stopPlay();
-                    console.debug('[purifier] stopPlay invoked early 🎉');
-                } catch (e) {
-                    console.warn('[purifier] stopPlay error', e);
-                }
-            } else {
-                console.warn('[purifier] stopPlay instance not found');
-            }
-
-            /* —— 立即恢复主视频 —— */
-            setTimeout(() => {
+        const src = this.currentSrc || this.src;
+        if (src && src.includes(AD_HOST)) {
+            stopPlayFn?.(); // 秒杀广告状态机
+            queueMicrotask(() => {
                 const main = document.querySelector(MAIN_VIDEO_SEL);
-                if (main && main !== this) {
-                    try {
-                        main.play().catch(() => {});
-                    } catch {
-                        pass();
-                    }
-                }
-            }, 50);
-
-            return Promise.resolve(); // 广告流被截断
+                if (main && main !== this)
+                    nativePlay.call(main).catch(() => {});
+            });
+            return Promise.resolve();
         }
-
-        /* —— 非广告正常播放 —— */
         return nativePlay.apply(this, args);
     };
 
-    console.log('Purifier V7 loaded');
+    console.log('Purifier V8 loaded');
 })();
