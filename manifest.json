@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "爱壹帆纯净版",
+    "name": "爱壹帆终极净化器",
     "version": "2.0",
     "description": "Remove static Ads and in-video Ads",
     "permissions": ["declarativeNetRequest"],

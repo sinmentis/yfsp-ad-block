@@ -1,4 +1,3 @@
-// hijack.js V8 – cached stopPlay + microtask resume
 (() => {
     const AD_HOST = 'global-cdn.me';
     const MAIN_VIDEO_SEL = 'video#video_player';
@@ -57,7 +56,7 @@
     HTMLVideoElement.prototype.play = function (...args) {
         const src = this.currentSrc || this.src;
         if (src && src.includes(AD_HOST)) {
-            stopPlayFn?.(); // 秒杀广告状态机
+            stopPlayFn?.();
             queueMicrotask(() => {
                 const main = document.querySelector(MAIN_VIDEO_SEL);
                 if (main && main !== this)

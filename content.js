@@ -1,5 +1,5 @@
 (function () {
-    console.log('爱壹帆终极净化器 Pro 启动');
+    console.log('爱壹帆终极净化器启动');
 
     const removeStatic = () => {
         document
