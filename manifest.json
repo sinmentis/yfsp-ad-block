@@ -1,0 +1,26 @@
+{
+    "manifest_version": 3,
+    "name": "爱壹帆纯净版",
+    "version": "1.0",
+    "description": "Remove static Ads",
+    "permissions": ["declarativeNetRequest"],
+    "host_permissions": ["*://*.yfsp.tv/*", "*://*.global-cdn.me/*"],
+    "icons": {
+        "16": "icons/icon.png",
+        "48": "icons/icon.png",
+        "128": "icons/icon.png"
+    },
+    "content_scripts": [
+        {
+            "matches": ["*://*.yfsp.tv/*"],
+            "js": ["content.js"],
+            "run_at": "document_start"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["hijack.js"],
+            "matches": ["*://*.yfsp.tv/*"]
+        }
+    ]
+}
